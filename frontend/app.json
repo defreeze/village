@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "instagram",
-    "slug": "instagram",
+    "name": "village",
+    "slug": "village",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
@@ -17,25 +17,15 @@
       "**/*"
     ],
     "android": {
-      "useNextNotificationsApi": true,
+
       "package": "com.instagram.simcoder",
-      "googleServicesFile": "./google-services.json",
-      "config": {
-        "googleSignIn": {
-          "apiKey": "****"
-        }
-      }
+      "googleServicesFile": "./google-services.json"
     },
     "ios": {
       "buildNumber": "1.0.0",
       "supportsTablet": true,
       "bundleIdentifier": "com.instagram.simcoder",
-      "config": {
-        "googleSignIn": {
-          "reservedClientId": "****"
-        },
-        "googleMapsApiKey": "****"
-      },
+     
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "web": {

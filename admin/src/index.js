@@ -4,11 +4,14 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
-import firebase from 'firebase';
+// Import Firebaaaase modular SDK
+import { initializeApp } from 'firebase/app';
 
-const firebaseConfig = require('./config/config').firebaseConfig;
-firebase.initializeApp(firebaseConfig)
+// Import the Firebase configuration
+import { firebaseConfig } from './config/config';
 
+// Initialize Firebase
+initializeApp(firebaseConfig);
 
 ReactDOM.render(
   <React.StrictMode>
@@ -21,5 +24,3 @@ ReactDOM.render(
 // to log results (for example: reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
-
-

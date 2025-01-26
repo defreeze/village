@@ -1,13 +1,14 @@
-import { getFocusedRouteNameFromRoute, NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import 'expo-asset';
-import * as firebase from 'firebase';
-import _ from 'lodash';
 import React, { Component } from 'react';
 import { Image, LogBox } from 'react-native';
 import { Provider } from 'react-redux';
 import { applyMiddleware, createStore } from 'redux';
 import thunk from 'redux-thunk';
+import { NavigationContainer, getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { initializeApp } from 'firebase/app';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import _ from 'lodash';
+import rootReducer from './redux/reducers'; // Redux root reducer
 import LoginScreen from './components/auth/Login';
 import RegisterScreen from './components/auth/Register';
 import MainScreen from './components/Main';
@@ -19,132 +20,130 @@ import PostScreen from './components/main/post/Post';
 import EditScreen from './components/main/profile/Edit';
 import ProfileScreen from './components/main/profile/Profile';
 import BlockedScreen from './components/main/random/Blocked';
-import { container } from './components/styles';
-import rootReducer from './redux/reducers';
+import { container } from './components/styles'; // Your custom styles
 
-const store = createStore(rootReducer, applyMiddleware(thunk))
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyDsc6iMiPIzezGfFQv3U_LjKTTua2xcnRQ",
+  authDomain: "village-77c9f.firebaseapp.com",
+  databaseURL: "https://village-77c9f-default-rtdb.firebaseio.com",
+  projectId: "village-77c9f",
+  storageBucket: "village-77c9f.firebasestorage.app",
+  messagingSenderId: "934742515805",
+  appId: "1:934742515805:web:3cbf4d9925ae2fc6cdadb4",
+  measurementId: "G-RBEMMXKH98",
+};
 
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+// Redux Store
+const store = createStore(rootReducer, applyMiddleware(thunk));
+
+// Suppress Specific Warnings
 LogBox.ignoreLogs(['Setting a timer']);
-const _console = _.clone(console);
-console.warn = message => {
-  if (message.indexOf('Setting a timer') <= -1) {
-    _console.warn(message);
+// Store the original console.warn method
+const originalWarn = console.warn;
+
+// Override console.warn to filter out specific warnings
+console.warn = (message, ...args) => {
+  if (!message.includes('Setting a timer')) {
+    originalWarn(message, ...args);
   }
 };
-
-const firebaseConfig = {
-  apiKey: "****",
-  authDomain: "****",
-  databaseURL: "****",
-  projectId: "****",
-  storageBucket: "****",
-  messagingSenderId: "****",
-  appId: "****",
-  measurementId: "****"
-};
-
-const logo = require('./assets/logo.png')
-
-if (firebase.apps.length === 0) {
-  firebase.initializeApp(firebaseConfig)
-}
-
+// Navigation Stack
 const Stack = createStackNavigator();
 
 export class App extends Component {
   constructor(props) {
-    super()
+    super();
     this.state = {
+      loggedIn: null,
       loaded: false,
-    }
+    };
   }
 
   componentDidMount() {
-    firebase.auth().onAuthStateChanged((user) => {
-      if (!user) {
-        this.setState({
-          loggedIn: false,
-          loaded: true,
-        })
+    // Check authentication state
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        this.setState({ loggedIn: true, loaded: true });
       } else {
-        this.setState({
-          loggedIn: true,
-          loaded: true,
-        })
+        this.setState({ loggedIn: false, loaded: true });
       }
-    })
+    });
   }
+
   render() {
     const { loggedIn, loaded } = this.state;
+
+    // Show Splash Screen while loading
     if (!loaded) {
-      return (
-        <Image style={container.splash} source={logo} />
-      )
+      return <Image style={container.splash} source={require('./assets/logo.png')} />;
     }
 
+    // If not logged in, show Login/Registration stack
     if (!loggedIn) {
       return (
         <NavigationContainer>
           <Stack.Navigator initialRouteName="Login">
-            <Stack.Screen name="Register" component={RegisterScreen} navigation={this.props.navigation} options={{ headerShown: false }} />
-            <Stack.Screen name="Login" navigation={this.props.navigation} component={LoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Register"
+              component={RegisterScreen}
+              options={{ headerShown: false }}
+            />
           </Stack.Navigator>
         </NavigationContainer>
       );
     }
 
+    // If logged in, show Main App stack
     return (
       <Provider store={store}>
-        <NavigationContainer >
+        <NavigationContainer>
           <Stack.Navigator initialRouteName="Main">
-            <Stack.Screen key={Date.now()} name="Main" component={MainScreen} navigation={this.props.navigation} options={({ route }) => {
-              const routeName = getFocusedRouteNameFromRoute(route) ?? 'Feed';
-
-              switch (routeName) {
-                case 'Camera': {
-                  return {
-                    headerTitle: 'Camera',
-                  };
+            <Stack.Screen
+              name="Main"
+              component={MainScreen}
+              options={({ route }) => {
+                const routeName = getFocusedRouteNameFromRoute(route) ?? 'Feed';
+                switch (routeName) {
+                  case 'Camera':
+                    return { headerTitle: 'Camera' };
+                  case 'Chat':
+                    return { headerTitle: 'Chat' };
+                  case 'Profile':
+                    return { headerTitle: 'Profile' };
+                  case 'Search':
+                    return { headerTitle: 'Search' };
+                  default:
+                    return { headerTitle: 'Village' };
                 }
-                case 'chat': {
-                  return {
-                    headerTitle: 'Chat',
-                  };
-                }
-                case 'Profile': {
-                  return {
-                    headerTitle: 'Profile',
-                  };
-                }
-                case 'Search': {
-                  return {
-                    headerTitle: 'Search',
-                  };
-                }
-                case 'Feed':
-                default: {
-                  return {
-                    headerTitle: 'Instagram',
-                  };
-                }
-              }
-            }}
+              }}
             />
-            <Stack.Screen key={Date.now()} name="Save" component={SaveScreen} navigation={this.props.navigation} />
-            <Stack.Screen key={Date.now()} name="video" component={SaveScreen} navigation={this.props.navigation} />
-            <Stack.Screen key={Date.now()} name="Post" component={PostScreen} navigation={this.props.navigation} />
-            <Stack.Screen key={Date.now()} name="Chat" component={ChatScreen} navigation={this.props.navigation} />
-            <Stack.Screen key={Date.now()} name="ChatList" component={ChatListScreen} navigation={this.props.navigation} />
-            <Stack.Screen key={Date.now()} name="Edit" component={EditScreen} navigation={this.props.navigation} />
-            <Stack.Screen key={Date.now()} name="Profile" component={ProfileScreen} navigation={this.props.navigation} />
-            <Stack.Screen key={Date.now()} name="Comment" component={CommentScreen} navigation={this.props.navigation} />
-            <Stack.Screen key={Date.now()} name="ProfileOther" component={ProfileScreen} navigation={this.props.navigation} />
-            <Stack.Screen key={Date.now()} name="Blocked" component={BlockedScreen} navigation={this.props.navigation} options={{ headerShown: false }} />
+            <Stack.Screen name="Save" component={SaveScreen} />
+            <Stack.Screen name="Post" component={PostScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="ChatList" component={ChatListScreen} />
+            <Stack.Screen name="Edit" component={EditScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Comment" component={CommentScreen} />
+            <Stack.Screen
+              name="Blocked"
+              component={BlockedScreen}
+              options={{ headerShown: false }}
+            />
           </Stack.Navigator>
         </NavigationContainer>
       </Provider>
-    )
+    );
   }
 }
 
-export default App
+export default App;

@@ -1,0 +1,1 @@
+{"ast":null,"code":"export * from \"./Updates\";","map":{"version":3,"names":[],"sources":["C:\\Users\\alexd\\Documents\\InstagramClone\\frontend\\node_modules\\expo-updates\\src\\index.ts"],"sourcesContent":["export * from './Updates';\n"],"mappings":"AAAA","ignoreList":[]},"metadata":{},"sourceType":"module","externalDependencies":[]}

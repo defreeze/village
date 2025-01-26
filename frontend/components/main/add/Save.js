@@ -1,6 +1,5 @@
 import { Feather } from '@expo/vector-icons';
 import { Video } from 'expo-av';
-import firebase from 'firebase';
 import React, { useLayoutEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MentionsTextInput from 'react-native-mentions';
@@ -9,160 +8,145 @@ import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import { fetchUserPosts, sendNotification } from '../../../redux/actions/index';
 import { container, navbar, text, utils } from '../../styles';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, collection, doc, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-
-require("firebase/firestore")
-require("firebase/firebase-storage")
-
-
+const auth = getAuth();
+const db = getFirestore();
+const storage = getStorage();
 
 function Save(props) {
-    const [caption, setCaption] = useState("")
-    const [uploading, setUploading] = useState(false)
-    const [error, setError] = useState(false)
-    const [data, setData] = useState("")
-    const [keyword, setKeyword] = useState("")
-
+    const [caption, setCaption] = useState("");
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState(false);
+    const [data, setData] = useState([]);
+    const [keyword, setKeyword] = useState("");
 
     useLayoutEffect(() => {
         props.navigation.setOptions({
             headerRight: () => (
-                <Feather style={navbar.image} name="check" size={24} color="green" onPress={() => { uploadImage() }} />
+                <Feather style={navbar.image} name="check" size={24} color="green" onPress={uploadImage} />
             ),
         });
     }, [caption]);
 
     const uploadImage = async () => {
-        if (uploading) {
-            return;
+        if (uploading) return;
+
+        setUploading(true);
+
+        try {
+            const downloadURL = await saveToStorage(props.route.params.source, `post/${auth.currentUser.uid}/${Math.random().toString(36)}`);
+            let downloadURLStill = null;
+
+            if (props.route.params.imageSource != null) {
+                downloadURLStill = await saveToStorage(props.route.params.imageSource, `post/${auth.currentUser.uid}/${Math.random().toString(36)}`);
+            }
+
+            await savePostData(downloadURL, downloadURLStill);
+        } catch (err) {
+            setError(true);
+            setUploading(false);
+            console.error('Upload failed:', err.message);
         }
-        setUploading(true)
-        let downloadURLStill = null
-        let downloadURL = await SaveStorage(props.route.params.source, `post/${firebase.auth().currentUser.uid}/${Math.random().toString(36)}`)
+    };
 
-        if (props.route.params.imageSource != null) {
-            downloadURLStill = await SaveStorage(props.route.params.imageSource, `post/${firebase.auth().currentUser.uid}/${Math.random().toString(36)}`)
-        }
+    const saveToStorage = async (image, path) => {
+        if (image === 'default') return '';
 
-        savePostData(downloadURL, downloadURLStill);
-
-    }
-
-    const SaveStorage = async (image, path) => {
-        if (image == 'default') {
-            return '';
-        }
-
-        const fileRef = firebase.storage().ref()
-            .child(path);
-
+        const fileRef = ref(storage, path);
         const response = await fetch(image);
         const blob = await response.blob();
+        await uploadBytes(fileRef, blob);
 
-        const task = await fileRef.put(blob);
-
-        const downloadURL = await task.ref.getDownloadURL();
-
+        const downloadURL = await getDownloadURL(fileRef);
         return downloadURL;
-    }
-    const savePostData = (downloadURL, downloadURLStill) => {
-        let object = {
+    };
+
+    const savePostData = async (downloadURL, downloadURLStill) => {
+        const postObject = {
             downloadURL,
             caption,
             likesCount: 0,
             commentsCount: 0,
             type: props.route.params.type,
-            creation: firebase.firestore.FieldValue.serverTimestamp()
+            creation: serverTimestamp(),
+        };
+
+        if (downloadURLStill) {
+            postObject.downloadURLStill = downloadURLStill;
         }
-        if (downloadURLStill != null) {
-            object.downloadURLStill = downloadURLStill
-        }
 
-        firebase.firestore()
-            .collection('posts')
-            .doc(firebase.auth().currentUser.uid)
-            .collection("userPosts")
-            .add(object).then((result) => {
-                props.fetchUserPosts()
-                props.navigation.popToTop()
-            }).catch((error) => {
-                setUploading(false)
-                setError(true)
-            })
+        try {
+            const userPostsRef = collection(db, 'posts', auth.currentUser.uid, 'userPosts');
+            await addDoc(userPostsRef, postObject);
 
-        var pattern = /\B@[a-z0-9_-]+/gi;
-        let array = caption.match(pattern);
+            props.fetchUserPosts();
+            props.navigation.popToTop();
 
-        if (array !== null) {
+            const mentions = caption.match(/\B@[a-z0-9_-]+/gi);
+            if (mentions) {
+                for (const mention of mentions) {
+                    const usersQuery = query(collection(db, 'users'), where('username', '==', mention.substring(1)));
+                    const snapshot = await getDocs(usersQuery);
 
-            for (let i = 0; i < array.length; i++) {
-                firebase.firestore()
-                    .collection("users")
-                    .where("username", "==", array[i].substring(1))
-                    .get()
-                    .then((snapshot) => {
-
-                        snapshot.forEach((doc) => {
-                            props.sendNotification(doc.data().notificationToken, "New tag", `${props.currentUser.name} Tagged you in a post`, { type: 0, user: firebase.auth().currentUser.uid })
-
-                        });
-                    })
+                    snapshot.forEach((doc) => {
+                        props.sendNotification(
+                            doc.data().notificationToken,
+                            'New tag',
+                            `${props.currentUser.name} tagged you in a post`,
+                            { type: 0, user: auth.currentUser.uid }
+                        );
+                    });
+                }
             }
+        } catch (err) {
+            setUploading(false);
+            setError(true);
+            console.error('Error saving post:', err.message);
         }
+    };
 
-
-    }
-
-    const renderSuggestionsRow = ({ item }, hidePanel) => {
-        return (
-            <TouchableOpacity onPress={() => onSuggestionTap(item.username, hidePanel)}>
-                <View style={styles.suggestionsRowContainer}>
-                    <View style={styles.userIconBox}>
-                        <Image
-                            style={{ aspectRatio: 1 / 1, height: 45 }}
-                            source={{
-                                uri: item.image
-                            }}
-                        />
-                    </View>
-                    <View style={styles.userDetailsBox}>
-                        <Text style={styles.displayNameText}>{item.name}</Text>
-                        <Text style={styles.usernameText}>@{item.username}</Text>
-                    </View>
+    const renderSuggestionsRow = ({ item }, hidePanel) => (
+        <TouchableOpacity onPress={() => onSuggestionTap(item.username, hidePanel)}>
+            <View style={styles.suggestionsRowContainer}>
+                <View style={styles.userIconBox}>
+                    <Image
+                        style={{ aspectRatio: 1, height: 45 }}
+                        source={{ uri: item.image }}
+                    />
                 </View>
-            </TouchableOpacity>
-        )
-    }
+                <View style={styles.userDetailsBox}>
+                    <Text style={styles.displayNameText}>{item.name}</Text>
+                    <Text style={styles.usernameText}>@{item.username}</Text>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
 
     const onSuggestionTap = (username, hidePanel) => {
         hidePanel();
-        const comment = caption.slice(0, - keyword.length)
-        setCaption(comment + '@' + username + " ");
-    }
+        const comment = caption.slice(0, -keyword.length);
+        setCaption(`${comment}@${username} `);
+    };
 
+    const callback = async (keyword) => {
+        setKeyword(keyword);
+        const usersQuery = query(collection(db, 'users'), where('username', '>=', keyword.substring(1)));
+        const snapshot = await getDocs(usersQuery);
 
-    const callback = (keyword) => {
-        setKeyword(keyword)
-        firebase.firestore()
-            .collection("users")
-            .where("username", ">=", keyword.substring(1))
-            .limit(10)
-            .get()
-            .then((snapshot) => {
-                let result = snapshot.docs.map(doc => {
+        const result = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
 
-                    const data = doc.data();
-                    const id = doc.id;
-                    return { id, ...data }
-                });
-                setData(result)
+        setData(result);
+    };
 
-            })
-    }
     return (
         <View style={[container.container, utils.backgroundWhite]}>
             {uploading ? (
-
                 <View style={[container.container, utils.justifyCenter, utils.alignItemsCenter]}>
                     <ActivityIndicator style={utils.marginBottom} size="large" />
                     <Text style={[text.bold, text.large]}>Upload in progress...</Text>
@@ -170,112 +154,79 @@ function Save(props) {
             ) : (
                 <View style={[container.container]}>
                     <View style={[container.container, utils.backgroundWhite, utils.padding15]}>
-
-                        <View style={[{ marginBottom: 20, width: '100%' }]}>
-
-
+                        <View style={{ marginBottom: 20, width: '100%' }}>
                             <MentionsTextInput
-
                                 textInputStyle={{ borderColor: '#ebebeb', borderWidth: 1, padding: 5, fontSize: 15, width: '100%' }}
                                 suggestionsPanelStyle={{ backgroundColor: 'rgba(100,100,100,0.1)' }}
-                                loadingComponent={() => <View style={{ flex: 1, width: 200, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator /></View>}
+                                loadingComponent={() => (
+                                    <View style={{ flex: 1, width: 200, justifyContent: 'center', alignItems: 'center' }}>
+                                        <ActivityIndicator />
+                                    </View>
+                                )}
                                 textInputMinHeight={30}
                                 textInputMaxHeight={80}
-                                trigger={'@'}
-                                triggerLocation={'new-word-only'} // 'new-word-only', 'anywhere'
+                                trigger="@"
+                                triggerLocation="new-word-only"
                                 value={caption}
                                 onChangeText={setCaption}
-                                triggerCallback={callback.bind(this)}
-                                renderSuggestionsRow={renderSuggestionsRow.bind(this)}
+                                triggerCallback={callback}
+                                renderSuggestionsRow={renderSuggestionsRow}
                                 suggestionsData={data}
                                 keyExtractor={(item, index) => item.username}
                                 suggestionRowHeight={45}
-                                horizontal={true}
+                                horizontal
                                 MaxVisibleRowCount={3}
                             />
                         </View>
                         <View>
-                            {props.route.params.type ?
-
+                            {props.route.params.type ? (
                                 <Image
-                                    style={container.image}
+                                    style={{ aspectRatio: 1, backgroundColor: 'black', width: '100%', height: undefined }}
                                     source={{ uri: props.route.params.source }}
-                                    style={{ aspectRatio: 1 / 1, backgroundColor: 'black' }}
                                 />
-
-                                :
-
+                            ) : (
                                 <Video
                                     source={{ uri: props.route.params.source }}
-                                    shouldPlay={true}
-                                    isLooping={true}
+                                    shouldPlay
+                                    isLooping
                                     resizeMode="cover"
-
-                                    style={{ aspectRatio: 1 / 1, backgroundColor: 'black' }}
+                                    style={{ aspectRatio: 1, backgroundColor: 'black' }}
                                 />
-                            }
+                            )}
                         </View>
-
                     </View>
-                    <Snackbar
-                        visible={error}
-                        duration={2000}
-                        onDismiss={() => setError(false)}>
-                        Something Went Wrong!
+                    <Snackbar visible={error} duration={2000} onDismiss={() => setError(false)}>
+                        Something went wrong!
                     </Snackbar>
                 </View>
             )}
-
         </View>
-
-    )
+    );
 }
+
 const styles = StyleSheet.create({
-    container: {
-        height: 300,
-        justifyContent: 'flex-end',
-        paddingTop: 100
-    },
-    suggestionsRowContainer: {
-        flexDirection: 'row',
-    },
-    userAvatarBox: {
-        width: 35,
-        paddingTop: 2
-    },
+    suggestionsRowContainer: { flexDirection: 'row' },
     userIconBox: {
         height: 45,
         width: 45,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#54c19c'
-    },
-    usernameInitials: {
-        color: '#fff',
-        fontWeight: '800',
-        fontSize: 14
+        backgroundColor: '#54c19c',
     },
     userDetailsBox: {
         flex: 1,
         justifyContent: 'center',
         paddingLeft: 10,
-        paddingRight: 15
+        paddingRight: 15,
     },
-    displayNameText: {
-        fontSize: 13,
-        fontWeight: '500'
-    },
-    usernameText: {
-        fontSize: 12,
-        color: 'rgba(0,0,0,0.6)'
-    }
+    displayNameText: { fontSize: 13, fontWeight: '500' },
+    usernameText: { fontSize: 12, color: 'rgba(0,0,0,0.6)' },
 });
 
 const mapStateToProps = (store) => ({
-    currentUser: store.userState.currentUser
-})
+    currentUser: store.userState.currentUser,
+});
 
 const mapDispatchProps = (dispatch) => bindActionCreators({ fetchUserPosts, sendNotification }, dispatch);
-
 
 export default connect(mapStateToProps, mapDispatchProps)(Save);

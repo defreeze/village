@@ -17,7 +17,7 @@ import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
 import InboxIcon from '@material-ui/icons/MoveToInbox';
 import MailIcon from '@material-ui/icons/Mail';
-import { BrowserRouter as Router, Link, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Link, Route } from 'react-router-dom';
 import Users from './Users';
 import User from './User';
 import Post from './Post';
@@ -100,9 +100,9 @@ export default function Home() {
     const handleDrawerClose = () => {
         setOpen(false);
     };
-    return (
-        <Router >
 
+    return (
+        <Router>
             <div className={classes.root}>
                 <CssBaseline />
                 <AppBar
@@ -124,8 +124,8 @@ export default function Home() {
                             <MenuIcon />
                         </IconButton>
                         <Typography variant="h6" noWrap>
-                            FreeRide Admin
-          </Typography>
+                            village
+                        </Typography>
                     </Toolbar>
                 </AppBar>
                 <Drawer
@@ -149,9 +149,11 @@ export default function Home() {
                     <Divider />
                     <List>
                         {['Users'].map((text, index) => (
-                            <ListItem button key={text}  >
-                                <Link style={{display: 'table'}} to={`/${text}`} >
-                                    <ListItemIcon >{index % 2 === 0 ? <InboxIcon /> : <MailIcon />}</ListItemIcon>
+                            <ListItem button key={text}>
+                                <Link style={{ display: 'table', textDecoration: 'none', color: 'inherit' }} to={`/${text}`}>
+                                    <ListItemIcon>
+                                        {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
+                                    </ListItemIcon>
                                     <ListItemText primary={text} />
                                 </Link>
                             </ListItem>
@@ -163,11 +165,10 @@ export default function Home() {
                         <Route path="/" exact component={Users} />
                         <Route path="/Users" exact component={Users} />
                         <Route path="/user/:id" exact component={User} />
-                        <Route path="/post/:id/:uid" exact component={Post} />
+                        <Route path="/post/:uid/:id" exact component={Post} />
                     </div>
                 </main>
             </div>
         </Router>
-
     );
 }

@@ -11,3 +11,17 @@ web-build/
 
 # macOS
 .DS_Store
+
+
+
+# Logs
+logs/
+*.log
+
+# Build directories
+build/
+dist/
+
+
+# Environment Variables
+.env
