@@ -1,18 +1,20 @@
 // components/main.js
-import { createMaterialBottomTabNavigator } from '@react-navigation/material-bottom-tabs';
-import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { createMaterialBottomTabNavigator } from '@react-navigation/material-bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import * as Notifications from 'expo-notifications';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import { reload } from '../redux/actions/index';
+import { getAuth } from 'firebase/auth';
+
+// Import your screens
 import CameraScreen from './main/add/Camera';
 import ChatListScreen from './main/chat/List';
 import FeedScreen from './main/post/Feed';
 import ProfileScreen from './main/profile/Profile';
 import SearchScreen from './main/profile/Search';
-import { getAuth } from 'firebase/auth';
 
 const Tab = createMaterialBottomTabNavigator();
 
