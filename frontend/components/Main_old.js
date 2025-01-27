@@ -1,4 +1,3 @@
-// components/main.js
 import { createMaterialBottomTabNavigator } from '@react-navigation/material-bottom-tabs';
 import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState } from 'react';
@@ -18,12 +17,11 @@ const Tab = createMaterialBottomTabNavigator();
 
 function Main(props) {
     const [unreadChats, setUnreadChats] = useState(false);
-    const [lastNot, setLastNot] = useState(null);
+    const [lastNot, setLastNot] = useState(false);
 
     const lastNotificationResponse = Notifications.useLastNotificationResponse();
     const auth = getAuth(); // Initialize Firebase Authentication
 
-    // Handle last notification response in useEffect to prevent state updates in render
     useEffect(() => {
         if (lastNotificationResponse != null && lastNotificationResponse !== lastNot) {
             setLastNot(lastNotificationResponse);
@@ -43,6 +41,7 @@ function Main(props) {
             }
         }
     }, [lastNotificationResponse, lastNot, props.navigation]);
+    
 
     useEffect(() => {
         props.reload();
@@ -58,15 +57,13 @@ function Main(props) {
                 case "profile":
                     props.navigation.navigate("ProfileOther", { uid: data.user, username: undefined, notification: true });
                     break;
-                default:
-                    break;
             }
         });
 
         return () => {
             notificationListener.remove(); // Cleanup notification listener
         };
-    }, [props]);
+    }, []);
 
     useEffect(() => {
         if (props.currentUser != null) {
@@ -74,10 +71,13 @@ function Main(props) {
                 props.navigation.navigate("Blocked");
             }
         }
-
-        const hasUnread = props.chats.some(chat => !chat[auth.currentUser?.uid]);
-        setUnreadChats(hasUnread);
-    }, [props.currentUser, props.chats, auth.currentUser?.uid, props.navigation]);
+        setUnreadChats(false);
+        for (let i = 0; i < props.chats.length; i++) {
+            if (!props.chats[i][auth.currentUser?.uid]) {
+                setUnreadChats(true);
+            }
+        }
+    }, [props.currentUser, props.chats]);
 
     if (props.currentUser == null) {
         return <View></View>;
@@ -88,11 +88,17 @@ function Main(props) {
             <Tab.Navigator
                 initialRouteName="Feed"
                 labeled={false}
-                activeColor="#000"
-                inactiveColor="#888"
+                tabBarOptions={{
+                    showIcon: true,
+                    showLabel: false,
+                    indicatorStyle: {
+                        opacity: 0,
+                    },
+                }}
                 barStyle={{ backgroundColor: '#ffffff' }}
             >
                 <Tab.Screen
+                    key={Date.now()}
                     name="Feed"
                     component={FeedScreen}
                     options={{
@@ -102,8 +108,10 @@ function Main(props) {
                     }}
                 />
                 <Tab.Screen
+                    key={Date.now()}
                     name="Search"
                     component={SearchScreen}
+                    navigation={props.navigation}
                     options={{
                         tabBarLabel: 'Search',
                         tabBarIcon: ({ color, size }) => (
@@ -112,8 +120,10 @@ function Main(props) {
                     }}
                 />
                 <Tab.Screen
+                    key={Date.now()}
                     name="Camera"
                     component={CameraScreen}
+                    navigation={props.navigation}
                     options={{
                         tabBarIcon: ({ color, size }) => (
                             <MaterialCommunityIcons name="camera" color={color} size={26} />
@@ -121,8 +131,10 @@ function Main(props) {
                     }}
                 />
                 <Tab.Screen
-                    name="Chat"
+                    key={Date.now()}
+                    name="chat"
                     component={ChatListScreen}
+                    navigation={props.navigation}
                     options={{
                         tabBarIcon: ({ color, size }) => (
                             <View>
@@ -133,11 +145,10 @@ function Main(props) {
                                             width: 10,
                                             height: 10,
                                             position: 'absolute',
-                                            right: -5,
-                                            top: -5,
-                                            borderRadius: 5,
+                                            right: 0,
+                                            borderRadius: 100,
                                         }}
-                                    />
+                                    ></View>
                                 )}
                                 <MaterialCommunityIcons name="chat" color={color} size={26} />
                             </View>
@@ -147,6 +158,7 @@ function Main(props) {
                 <Tab.Screen
                     name="Profile"
                     component={ProfileScreen}
+                    navigation={props.navigation}
                     listeners={({ navigation }) => ({
                         tabPress: (event) => {
                             event.preventDefault();
@@ -169,7 +181,6 @@ const mapStateToProps = (store) => ({
     chats: store.userState.chats,
     friendsRequestsReceived: store.userState.friendsRequestsReceived,
 });
-
 const mapDispatchProps = (dispatch) => bindActionCreators({ reload }, dispatch);
 
 export default connect(mapStateToProps, mapDispatchProps)(Main);
